@@ -214,7 +214,8 @@ Panel {
       id: button
       anchors.fill: parent
       bar: root.bar
-      text: root.on ? root.glyphOn : root.glyphOff
+      // Same shield on and off; off is dimmed with a strike-through drawn on top.
+      text: root.glyphOn
       dimmed: !root.on
       tooltipText: root.opened ? "" : root.busy ? root.busyTip : (root.on ? root.displayName + " · " + root.countryOf(root.shown) : root.displayName + " · Off")
       onPressed: function(b) {
@@ -222,6 +223,18 @@ Panel {
         else if (b === Qt.MiddleButton) root.refresh()
         else root.toggle()
       }
+    }
+
+    Rectangle {
+      visible: !root.on
+      anchors.centerIn: parent
+      width: Math.round(Math.min(parent.width, parent.height) * 0.75)
+      height: 2
+      radius: 1
+      rotation: -45
+      color: root.foreground
+      opacity: 0.45
+      antialiasing: true
     }
   }
 
@@ -272,7 +285,7 @@ Panel {
                 meta: root.busy ? root.busyTip : (root.on ? root.countryOf(root.shown) + " · " + root.shown : "Off")
                 foreground: root.foreground
                 fontFamily: root.fontFamily
-                iconComponent: Component { Text { textFormat: Text.PlainText; text: root.on ? root.glyphOn : root.glyphOff; color: root.on ? root.foreground : root.dim; font.family: Style.font.family; font.pixelSize: Math.round(Style.font.display) } }
+                iconComponent: Component { Text { id: heroGlyph; textFormat: Text.PlainText; text: root.glyphOn; color: root.foreground; opacity: root.on ? 1 : 0.45; font.family: Style.font.family; font.pixelSize: Math.round(Style.font.display); Rectangle { visible: !root.on; anchors.centerIn: parent; width: Math.round(Math.min(heroGlyph.width, heroGlyph.height) * 0.75); height: 2; radius: 1; rotation: -45; color: root.foreground; antialiasing: true } } }
                 trailingControl: Component {
                   ToggleSwitch {
                     id: powerSwitch
