@@ -4,7 +4,7 @@ A VPN switch for your Omarchy top bar. Turn Proton VPN on and off, and pick a co
 
 Works with Proton VPN. Unofficial, not affiliated with Proton AG.
 
-![The pvpn panel in the Omarchy bar](docs/panel.png)
+![The VPN panel open from the Omarchy top bar, connected to Denmark, with a list of locations to switch to](docs/panel.png)
 
 > [!CAUTION]
 > **No kill switch.**
@@ -66,6 +66,14 @@ That's it. Click the shield.
 Shield not showing? Run `omarchy-restart-shell`. Can't connect? See [Good to know](#good-to-know).
 
 ## Using it
+
+The shield in your top bar shows the VPN's state at a glance. A bright shield means you're connected. A dimmed shield with a line through it means the VPN is off:
+
+![The Omarchy top bar with the dimmed, struck-through shield showing the VPN is off](docs/bar-off.png)
+
+Switching location takes two clicks:
+
+![Clicking the shield, picking United States (east), and the "Connected" notification appearing](docs/demo.gif)
 
 - Click the shield to open the panel.
 - The switch at the top turns the VPN on or off.
