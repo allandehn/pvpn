@@ -1,7 +1,7 @@
 # pvpn: an unofficial Proton VPN bar plugin for Omarchy
 
 > ⚠️ **Unofficial community project. Not affiliated with, endorsed by, or supported by Proton AG or Proton VPN.**
-> "Proton" and "Proton VPN" are trademarks of Proton AG; the repository name only describes what it works with.
+> "Proton" and "Proton VPN" are trademarks of Proton AG and are used here only to describe what this tool works with.
 > It only drives standard NetworkManager WireGuard profiles that you import yourself.
 
 ![The pvpn panel in the Omarchy bar](docs/panel.png)
