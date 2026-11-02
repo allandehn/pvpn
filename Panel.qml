@@ -261,8 +261,8 @@ Panel {
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(t) {
         if (root.busy) return
-        if (t === "t" || t === "T") root.toggleVpn()
-        else if ((t === "r" || t === "R") && root.active !== "") root.reconnect(root.active)
+        if (t === "t" || t === "T") { root.close(); root.toggleVpn() }
+        else if ((t === "r" || t === "R") && root.active !== "") { root.close(); root.reconnect(root.active) }
       }
 
       // Panel contents only exist while it is open.
@@ -293,7 +293,7 @@ Panel {
                     busy: root.busy
                     enabled: !root.busy
                     foreground: hero.foreground
-                    onToggled: root.toggleVpn()
+                    onToggled: { root.close(); root.toggleVpn() }
                     PanelToolTip { visible: powerSwitch.containsMouse; text: root.on ? "Turn " + root.displayName + " off" : "Turn " + root.displayName + " on"; fontFamily: hero.fontFamily }
                   }
                 }
