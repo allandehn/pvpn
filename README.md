@@ -1,16 +1,22 @@
-# Proton VPN for the Omarchy bar (`allandehn.pvpn`)
+# protonvpn: an unofficial Proton VPN bar plugin for Omarchy (`allandehn.pvpn`)
+
+> ⚠️ **Unofficial community project. Not affiliated with, endorsed by, or supported by Proton AG or Proton VPN.**
+> "Proton" and "Proton VPN" are trademarks of Proton AG; the repository name only describes what it works with.
+> It only drives standard NetworkManager WireGuard profiles that you import yourself.
+
+![The pvpn panel in the Omarchy bar](docs/panel.png)
 
 A small [Omarchy](https://omarchy.org) bar plugin, plus the `pvpn` CLI it uses as its engine, that shows and switches
 **Proton VPN WireGuard connections managed by NetworkManager**. No Proton app, no daemon,
 no background polling: it listens to `nmcli monitor` and only runs `nmcli` when something changes.
 
-> **Unofficial.** This project is not affiliated with, endorsed by, or supported by Proton AG or Proton VPN.
-> "Proton" and "Proton VPN" are trademarks of Proton AG. It only drives standard NetworkManager
-> WireGuard profiles that you import yourself.
-
 > **No kill switch.** If the tunnel drops, your traffic goes out **unprotected** over your normal
 > connection until you reconnect. Check DNS after connecting with `resolvectl status` and a
 > leak test such as <https://dnsleaktest.com>.
+
+## Naming
+
+The repository is `protonvpn`; the plugin id is `allandehn.pvpn` and the CLI is `pvpn`, and NetworkManager profiles are named `pvpn-<country>`. The short names keep the CLI quick to type and make clear it is not Proton's own `protonvpn` app.
 
 ## Features
 
@@ -99,8 +105,8 @@ or stop their daemon (e.g. `sudo systemctl disable --now mullvad-daemon`).
 ## 2. Install
 
 ```bash
-git clone https://github.com/allandehn/omarchy-pvpn.git
-cd omarchy-pvpn
+git clone https://github.com/allandehn/protonvpn.git
+cd protonvpn
 ./install.sh
 ```
 
