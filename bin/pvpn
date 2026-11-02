@@ -10,12 +10,14 @@
 #   pvpn down             disconnect all pvpn-* profiles
 #   pvpn toggle           down if connected, else up the last used profile
 #   pvpn boot [NAME|none] show or set the boot profile
+#   pvpn import [--name NAME] [FILE...]
+#                         add Proton WireGuard .conf files (default: ~/Downloads)
 #
 # Only connections that are type wireguard AND named pvpn-* are ever touched.
 # Boot follows the last state: a successful connect sets autoconnect=yes on that
 # profile and no on the other pvpn-* ones; down sets no on all of them.
 set -u
-VERSION="0.5.6"
+VERSION="0.5.7"
 DISPLAY_NAME="${PVPN_DISPLAY_NAME:-VPN}"   # notification app name/title (not a trademark)
 NOTIFY_ID="${XDG_STATE_HOME:-$HOME/.local/state}/pvpn/notify-id"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/pvpn/last"
@@ -39,6 +41,17 @@ label() { # pvpn-us-east -> United States (east)
     dk) land=Denmark ;; ee) land=Estonia ;; us) land="United States" ;; se) land=Sweden ;;
     no) land=Norway ;; de) land=Germany ;; nl) land=Netherlands ;; ch) land=Switzerland ;;
     fi) land=Finland ;; uk|gb) land="United Kingdom" ;; fr) land=France ;;
+    at) land=Austria ;; be) land=Belgium ;; es) land=Spain ;; it) land=Italy ;; pt) land=Portugal ;;
+    ie) land=Ireland ;; is) land=Iceland ;; pl) land=Poland ;; cz) land=Czechia ;; ro) land=Romania ;;
+    lt) land=Lithuania ;; lv) land=Latvia ;; lu) land=Luxembourg ;; hu) land=Hungary ;; gr) land=Greece ;;
+    bg) land=Bulgaria ;; hr) land=Croatia ;; si) land=Slovenia ;; sk) land=Slovakia ;; rs) land=Serbia ;;
+    ua) land=Ukraine ;; md) land=Moldova ;; cy) land=Cyprus ;; mt) land=Malta ;; tr) land=Turkey ;;
+    ca) land=Canada ;; mx) land=Mexico ;; br) land=Brazil ;; ar) land=Argentina ;; cl) land=Chile ;;
+    co) land=Colombia ;; pe) land=Peru ;; au) land=Australia ;; nz) land="New Zealand" ;; jp) land=Japan ;;
+    kr) land="South Korea" ;; sg) land=Singapore ;; hk) land="Hong Kong" ;; tw) land=Taiwan ;; in) land=India ;;
+    il) land=Israel ;; ae) land="United Arab Emirates" ;; za) land="South Africa" ;; ng) land=Nigeria ;;
+    eg) land=Egypt ;; my) land=Malaysia ;; th) land=Thailand ;; vn) land=Vietnam ;; ph) land=Philippines ;;
+    id) land=Indonesia ;; ge) land=Georgia ;; am) land=Armenia ;; al) land=Albania ;; ba) land="Bosnia and Herzegovina" ;;
     *) land="${cc^^}" ;;
   esac
   if [ -n "$rest" ]; then printf '%s (%s)\n' "$land" "${rest//-/ }"; else printf '%s\n' "$land"; fi
@@ -158,6 +171,86 @@ menu() {
   esac
 }
 
+# ---- import: add Proton WireGuard .conf files as pvpn-* connections ----
+taken() { nmcli -g NAME connection show 2>/dev/null | grep -Fxq -- "$1"; }
+
+# Proton file name -> lowercase country code. DK-123.conf, wg-DK-FREE-12.conf, US-NY#45.conf
+cc_of() {
+  local b="${1##*/}"; b="${b%.conf}"; b="${b,,}"
+  b="${b#wg-}"; b="${b#protonvpn-}"; b="${b#proton-}"
+  [[ "$b" =~ ^([a-z]{2})([^a-z]|$) ]] && printf '%s\n' "${BASH_REMATCH[1]}"
+}
+
+free_name() { # base -> base, base-2, base-3 ... (max 15 chars)
+  local base="$1" n=2 try="$1"
+  while taken "$try"; do try="${base:0:$((15 - ${#n} - 1))}-$n"; n=$((n + 1)); done
+  printf '%s\n' "$try"
+}
+
+import_one() { # file [custom name]
+  local f="$1" name="${2:-}" cc tmp
+  if [ ! -r "$f" ]; then echo "  Can't read $f, skipped." >&2; return 1; fi
+  { grep -q '^\[Interface\]' "$f" && grep -q '^PrivateKey' "$f"; } ||
+    { echo "  ${f##*/} doesn't look like a WireGuard file, skipped." >&2; return 1; }
+  if [ -n "$name" ]; then
+    case "$name" in pvpn-*) ;; *) name="pvpn-$name" ;; esac
+    name="${name,,}"
+    { [[ "$name" =~ ^pvpn-[a-z0-9-]+$ ]] && [ ${#name} -le 15 ]; } ||
+      { echo "  '$name' won't work as a name: use letters, numbers and '-', at most 15 characters in total." >&2; return 1; }
+    if taken "$name"; then echo "  You already have a connection called $name. Pick another name." >&2; return 1; fi
+  else
+    cc=$(cc_of "$f")
+    [ -n "$cc" ] || { echo "  Couldn't tell the location of ${f##*/}. Try: pvpn import --name pvpn-xx \"$f\"" >&2; return 1; }
+    name=$(free_name "pvpn-$cc")
+  fi
+  # nmcli names the connection after the file and rejects names like 'US-NY#45',
+  # so import a private copy named after the target.
+  tmp=$(mktemp -d) || return 1
+  chmod 700 "$tmp"; install -m 600 "$f" "$tmp/$name.conf"
+  if ! nmcli connection import type wireguard file "$tmp/$name.conf" >/dev/null 2>&1; then
+    shred -u "$tmp/$name.conf" 2>/dev/null; rmdir "$tmp"
+    echo "  Couldn't add ${f##*/}. The file is kept, so you can try again." >&2; return 1
+  fi
+  shred -u "$tmp/$name.conf" 2>/dev/null || rm -f "$tmp/$name.conf"; rmdir "$tmp"
+  nmcli connection modify "$name" connection.id "$name" connection.interface-name "$name" \
+    connection.autoconnect no >/dev/null 2>&1 ||
+    echo "  Note: couldn't turn off autoconnect on $name." >&2
+  echo "Added $(label "$name") ($name)"
+  if shred -u "$f" 2>/dev/null || rm -f "$f"; then
+    echo "  Deleted ${f##*/} from your disk, since it holds your private key."
+  else
+    echo "  Couldn't delete $f. Please delete it yourself." >&2
+  fi
+}
+
+import_cmd() {
+  local name="" files=() f ok=0 bad=0 dl="${XDG_DOWNLOAD_DIR:-$HOME/Downloads}"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --name) name="${2:-}"; [ -n "$name" ] || { echo "pvpn: --name needs a name, e.g. --name pvpn-dk-home" >&2; return 1; }; shift 2 ;;
+      --name=*) name="${1#--name=}"; shift ;;
+      *) files+=("$1"); shift ;;
+    esac
+  done
+  if [ -n "$name" ] && [ ${#files[@]} -ne 1 ]; then
+    echo "pvpn: --name works with exactly one file, e.g. pvpn import --name pvpn-dk-home ~/Downloads/DK-123.conf" >&2; return 1
+  fi
+  if [ ${#files[@]} -eq 0 ]; then
+    for f in "$dl"/*.conf; do [ -e "$f" ] && grep -q '^\[Interface\]' "$f" 2>/dev/null && files+=("$f"); done
+    if [ ${#files[@]} -eq 0 ]; then
+      echo "No Proton VPN files found in $dl."
+      echo "Download them first: sign in at https://account.protonvpn.com, open"
+      echo "Downloads > WireGuard configuration, and download one file per location."
+      return 1
+    fi
+  fi
+  for f in "${files[@]}"; do
+    if import_one "$f" "$name"; then ok=$((ok + 1)); else bad=$((bad + 1)); fi
+  done
+  if [ $ok -gt 0 ]; then echo "Done. Click the shield in your top bar to connect."; fi
+  [ $bad -eq 0 ]
+}
+
 case "${1:-menu}" in
   -v|--version) echo "pvpn $VERSION" ;;
   menu) menu ;;
@@ -167,7 +260,8 @@ case "${1:-menu}" in
   reconnect) go "${2:?name}" Reconnected reconnect ;;
   down) down ;;
   toggle) toggle ;;
+  import) shift; import_cmd "$@" ;;
   boot) if [ $# -ge 2 ]; then if [ "$2" = none ]; then set_boot ""; else need "$2"; set_boot "$2"; fi
         else b=$(boot | head -n1); echo "${b:-none}"; fi ;;
-  *) echo "usage: pvpn [menu|status|list|up NAME|reconnect NAME|down|toggle|boot [NAME|none]|--version]" >&2; exit 1 ;;
+  *) echo "usage: pvpn [menu|status|list|up NAME|reconnect NAME|down|toggle|boot [NAME|none]|import [--name NAME] [FILE...]|--version]" >&2; exit 1 ;;
 esac
