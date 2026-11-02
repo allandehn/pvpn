@@ -1,4 +1,6 @@
-# pvpn: an unofficial Proton VPN bar plugin for Omarchy
+# pvpn: an unofficial VPN bar plugin for Omarchy
+
+**Works with Proton VPN. Not affiliated with Proton AG.**
 
 > ⚠️ **Unofficial community project. Not affiliated with, endorsed by, or supported by Proton AG or Proton VPN.**
 > "Proton" and "Proton VPN" are trademarks of Proton AG and are used here only to describe what this tool works with.
