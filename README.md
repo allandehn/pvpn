@@ -21,7 +21,7 @@ The repository and the CLI are `pvpn`, the Omarchy plugin id is `allandehn.pvpn`
 
 ## Features
 
-- Bar icon: filled shield when connected, dimmed crossed shield when off. Tooltip `Proton VPN · Denmark` / `Proton VPN · Off`.
+- Bar icon: filled shield when connected, dimmed crossed shield when off. Tooltip `VPN · Denmark` / `VPN · Off`.
 - **Left click** opens a native Omarchy panel; **right click** toggles on/off; **middle click** refreshes.
 - Panel: on/off switch, one row per connection (country name), connected row in accent colour.
   Click a row (or move with `hjkl`/arrows and press `Enter`) to **switch** to it, or **reconnect** it if it is already active.
@@ -30,8 +30,9 @@ The repository and the CLI are `pvpn`, the Omarchy plugin id is `allandehn.pvpn`
   (after 0.3 s, so quick results don't flicker) and the tooltip says e.g. `Connecting to Denmark…` or `Checking Denmark…`.
   Other rows are ignored until it's done. Set `PVPN_REDUCED_MOTION=1` in the shell's environment for a static dim icon instead.
 - The connection is verified (NetworkManager state + a ping through the tunnel) before it is reported as connected.
-- Desktop notifications: `Connected to Estonia`, `Reconnected to Denmark`, `Proton VPN off`, or
-  `Couldn't connect to Estonia` – in which case the previous connection is restored (or it stays off).
+- Desktop notifications titled `VPN`, one at a time (each replaces the last): `Connected to Estonia`,
+  `Reconnected to Denmark`, `Disconnected`, or `Couldn't connect to Estonia · still connected to Denmark`
+  (the previous connection is restored, or it stays off). Set `PVPN_NOTIFY_ICON` to an icon name to add an icon.
 - **Boot follows the last state:** connecting sets `autoconnect=yes` on that `pvpn-*` profile only (and `no` on
   the other `pvpn-*` profiles); turning the VPN off sets `autoconnect=no` on all of them. The last used profile is
   remembered in `$HOME/.local/state/pvpn/last`. Non-`pvpn-*` connections are never touched.

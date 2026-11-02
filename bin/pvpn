@@ -15,7 +15,9 @@
 # Boot follows the last state: a successful connect sets autoconnect=yes on that
 # profile and no on the other pvpn-* ones; down sets no on all of them.
 set -u
-VERSION="0.5.0"
+VERSION="0.5.1"
+DISPLAY_NAME="${PVPN_DISPLAY_NAME:-VPN}"   # notification app name/title (not a trademark)
+NOTIFY_ID="${XDG_STATE_HOME:-$HOME/.local/state}/pvpn/notify-id"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/pvpn/last"
 PROBE="1.1.1.1"   # pinged through the tunnel to verify it carries traffic
 
@@ -42,9 +44,21 @@ label() { # pvpn-us-east -> United States (east)
   if [ -n "$rest" ]; then printf '%s (%s)\n' "$land" "${rest//-/ }"; else printf '%s\n' "$land"; fi
 }
 
-note() { # title [body]
-  if [ -t 1 ]; then printf '%s\n' "$*"; fi
-  notify-send -a "Proton VPN" "$@" 2>/dev/null || true
+note() { # body [normal|low]; one notice at a time (replaces the previous one)
+  local body="$1" urg="${2:-normal}" id="" new
+  if [ -t 1 ]; then printf '%s
+' "$body"; fi
+  command -v notify-send >/dev/null 2>&1 || return 0
+  [ -r "$NOTIFY_ID" ] && IFS= read -r id < "$NOTIFY_ID"
+  case "$id" in ''|*[!0-9]*) id="" ;; esac
+  local args=(-a "$DISPLAY_NAME" -u "$urg" -p -h string:x-canonical-private-synchronous:pvpn)
+  [ -n "${PVPN_NOTIFY_ICON:-}" ] && args+=(-i "$PVPN_NOTIFY_ICON")
+  # A stale id is harmless (the server just issues a new one); retry without -r if it errors.
+  new=$(notify-send "${args[@]}" ${id:+-r "$id"} "$DISPLAY_NAME" "$body" 2>/dev/null) ||
+    new=$(notify-send "${args[@]}" "$DISPLAY_NAME" "$body" 2>/dev/null) || return 0
+  new="${new//[!0-9]/}"
+  if [ -n "$new" ]; then mkdir -p "${NOTIFY_ID%/*}"; printf '%s
+' "$new" > "$NOTIFY_ID"; fi
 }
 
 # Set autoconnect=yes on $1 only (""=none); modify only profiles that change.
@@ -90,9 +104,9 @@ go() {
   nmcli connection down "$name" >/dev/null 2>&1
   if [ -n "$prev" ] && [ "$prev" != "$name" ] && { phase rollback "$prev"; bring "$prev"; }; then
     set_boot "$prev"; remember "$prev"
-    note "Couldn't $verb to $(label "$name")" "Still connected to $(label "$prev")"
+    note "Couldn't $verb to $(label "$name") · still connected to $(label "$prev")"
   else
-    set_boot ""; note "Couldn't $verb to $(label "$name")" "Proton VPN is off"
+    set_boot ""; note "Couldn't $verb to $(label "$name") · $DISPLAY_NAME is off"
   fi
   return 1
 }
@@ -101,7 +115,7 @@ down() {
   local c
   phase disconnecting
   while IFS= read -r c; do nmcli connection down "$c" >/dev/null 2>&1; done < <(active)
-  set_boot ""; note "Proton VPN off"
+  set_boot ""; note "Disconnected"
 }
 
 last_or_first() {
@@ -134,7 +148,7 @@ menu() {
   done < <(list)
   [ -n "$a" ] && items+="✕ Disconnect"$'\n'
   items+="ℹ Status"
-  choice=$(printf '%s' "$items" | ask "Proton VPN")
+  choice=$(printf '%s' "$items" | ask "$DISPLAY_NAME")
   case "$choice" in
     "") exit 0 ;;
     "✕ Disconnect") down ;;

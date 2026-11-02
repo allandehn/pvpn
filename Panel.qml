@@ -44,6 +44,12 @@ Panel {
     }
     return pending === "off" ? "Disconnecting…" : "Connecting to " + c + "…"
   }
+  // Shown name, read once from manifest.json "displayName" (falls back to "VPN").
+  property string displayName: "VPN"
+  FileView {
+    path: Qt.resolvedUrl("manifest.json").toString().replace(/^file:\/\//, "")
+    onLoaded: { try { root.displayName = JSON.parse(text()).displayName || "VPN" } catch (e) {} }
+  }
   readonly property string glyphOn: "󰒃"
   readonly property string glyphOff: "󰦞"
 
@@ -205,7 +211,7 @@ Panel {
     text: root.on ? root.glyphOn : root.glyphOff
     dimmed: !root.on
     opacity: root.pulseOpacity
-    tooltipText: root.opened ? "" : root.busy ? root.busyTip : (root.on ? "Proton VPN · " + root.countryOf(root.shown) : "Proton VPN · Off")
+    tooltipText: root.opened ? "" : root.busy ? root.busyTip : (root.on ? root.displayName + " · " + root.countryOf(root.shown) : root.displayName + " · Off")
     onPressed: function(b) {
       if (b === Qt.RightButton) root.toggleVpn()
       else if (b === Qt.MiddleButton) root.refresh()
@@ -256,7 +262,7 @@ Panel {
               PanelHero {
                 id: hero
                 width: parent.width
-                title: "Proton VPN"
+                title: root.displayName
                 meta: root.busy ? root.busyTip : (root.on ? root.countryOf(root.shown) + " · " + root.shown : "Off")
                 foreground: root.foreground
                 fontFamily: root.fontFamily
@@ -269,7 +275,7 @@ Panel {
                     enabled: !root.busy
                     foreground: hero.foreground
                     onToggled: root.toggleVpn()
-                    PanelToolTip { visible: powerSwitch.containsMouse; text: root.on ? "Turn Proton VPN off" : "Turn Proton VPN on"; fontFamily: hero.fontFamily }
+                    PanelToolTip { visible: powerSwitch.containsMouse; text: root.on ? "Turn " + root.displayName + " off" : "Turn " + root.displayName + " on"; fontFamily: hero.fontFamily }
                   }
                 }
               }
