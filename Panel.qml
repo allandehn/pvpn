@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -50,6 +51,31 @@ Panel {
     path: Qt.resolvedUrl("manifest.json").toString().replace(/^file:\/\//, "")
     onLoaded: { try { root.displayName = JSON.parse(text()).displayName || "VPN" } catch (e) {} }
   }
+  // Off icon: md-security (U+F0483) with the strike and knockout gap taken from
+  // md-shield_off (U+F099E), combined from the font's outlines (units, y down).
+  // Box 834x918 units; the strike overhangs the shield's left edge exactly as in shield_off.
+  component ShieldOff: Item {
+    id: shieldOff
+    property color color: "white"
+    width: height * 834 / 918
+    height: 16
+    Shape {
+      id: shieldShape
+      anchors.fill: parent
+      preferredRendererType: Shape.CurveRenderer
+      antialiasing: true
+      ShapePath {
+        fillColor: shieldOff.color
+        strokeWidth: -1
+        strokeColor: "transparent"
+        fillRule: ShapePath.WindingFill
+        scale: Qt.size(shieldOff.width / 834, shieldOff.height / 918)
+        PathSvg { path: "M 0 137 84 220.9 V 418 Q 84 531 133 636.5 Q 182 742 268 816.5 Q 354 891 459 918 Q 564 891 650 816.5 Q 657.9 809.6 665.5 802.5 L 607.1 744 Q 542.2 804.7 459 830 V 595.6 L 380 516.5 L 760 896 L 813 844 L 55 84Z M 459 0 195.7 117.9 258.5 180.9 459 92 V 381.9 L 535.8 459 H 750 Q 739.2 547.4 699.2 622.9 L 760.2 684 Q 773.6 661.1 785 636.5 Q 834 531 834 418 V 168Z M 322.4 459 H 168 V 304.8 L 322.4 459Z" }
+      }
+    }
+  }
+  Component { id: shieldOffIcon; ShieldOff { height: 15; color: root.foreground } }
+
   readonly property string glyphOn: "󰒃"
   readonly property string glyphOff: "󰦞"
 
@@ -214,7 +240,9 @@ Panel {
       id: button
       anchors.fill: parent
       bar: root.bar
-      text: root.on ? root.glyphOn : root.glyphOff
+      // Off: the same checkered shield, dimmed, with md-shield_off's own strike and gap.
+      text: root.on ? root.glyphOn : ""
+      iconComponent: root.on ? null : shieldOffIcon
       dimmed: !root.on
       tooltipText: root.opened ? "" : root.busy ? root.busyTip : (root.on ? root.displayName + " · " + root.countryOf(root.shown) : root.displayName + " · Off")
       onPressed: function(b) {
@@ -248,8 +276,8 @@ Panel {
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(t) {
         if (root.busy) return
-        if (t === "t" || t === "T") root.toggleVpn()
-        else if ((t === "r" || t === "R") && root.active !== "") root.reconnect(root.active)
+        if (t === "t" || t === "T") { root.close(); root.toggleVpn() }
+        else if ((t === "r" || t === "R") && root.active !== "") { root.close(); root.reconnect(root.active) }
       }
 
       // Panel contents only exist while it is open.
@@ -272,7 +300,16 @@ Panel {
                 meta: root.busy ? root.busyTip : (root.on ? root.countryOf(root.shown) + " · " + root.shown : "Off")
                 foreground: root.foreground
                 fontFamily: root.fontFamily
-                iconComponent: Component { Text { textFormat: Text.PlainText; text: root.on ? root.glyphOn : root.glyphOff; color: root.on ? root.foreground : root.dim; font.family: Style.font.family; font.pixelSize: Math.round(Style.font.display) } }
+                iconComponent: Component {
+                  Item {
+                    implicitWidth: root.on ? heroGlyph.implicitWidth : heroOff.width
+                    implicitHeight: heroGlyph.implicitHeight
+                    opacity: root.on ? 1 : 0.45
+                    Text { id: heroGlyph; visible: root.on; textFormat: Text.PlainText; text: root.glyphOn; color: root.foreground; font.family: Style.font.family; font.pixelSize: Math.round(Style.font.display) }
+                    // md-security's ink is 918 of 1000 font units tall.
+                    ShieldOff { id: heroOff; visible: !root.on; anchors.verticalCenter: parent.verticalCenter; height: Math.round(Style.font.display) * 0.918; color: root.foreground }
+                  }
+                }
                 trailingControl: Component {
                   ToggleSwitch {
                     id: powerSwitch
@@ -280,7 +317,7 @@ Panel {
                     busy: root.busy
                     enabled: !root.busy
                     foreground: hero.foreground
-                    onToggled: root.toggleVpn()
+                    onToggled: { root.close(); root.toggleVpn() }
                     PanelToolTip { visible: powerSwitch.containsMouse; text: root.on ? "Turn " + root.displayName + " off" : "Turn " + root.displayName + " on"; fontFamily: hero.fontFamily }
                   }
                 }
