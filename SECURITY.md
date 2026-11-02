@@ -9,7 +9,7 @@ If you find a security problem, please **don't open a public issue**. Report it 
 1. Go to the [Security tab](https://github.com/allandehn/pvpn/security) of this repo.
 2. Click **Report a vulnerability** and describe what you found.
 
-Only the maintainer can see private reports. Expect a reply within about a week.
+Only the maintainer can see private reports. Expect a reply within about 24 to 48 hours.
 
 ## What counts
 
