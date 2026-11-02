@@ -1,0 +1,11 @@
+# Never commit WireGuard configs: they contain your private key.
+*.conf
+*.conf.*
+*.nmconnection
+*.key
+*.pem
+.env
+# Screenshots only when the README uses them
+*.png
+!docs/*.png
+.DS_Store
