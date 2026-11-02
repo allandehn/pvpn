@@ -126,11 +126,11 @@ omarchy-restart-shell                          # required: plugin edits only loa
 
 ## Uninstall
 
-Removing pvpn takes three steps. Step 1 removes the tool; steps 2 and 3 are optional and remove your VPN profiles and keys too.
+Step 1 removes the tool. Steps 2 to 4 are optional and remove your VPN profiles, keys and config files too; deleting profiles is irreversible.
 
 ### 1. Remove the plugin and the CLI
 
-From the cloned `pvpn` folder:
+From the cloned `pvpn` folder, read `uninstall.sh` first (it is short), then run it. Never run an uninstaller piped from the web (`curl … | bash`).
 
 ```bash
 ./uninstall.sh
@@ -169,11 +169,22 @@ Deleting a profile also deletes its private key from `/etc/NetworkManager/system
 
 Sign in at [account.protonvpn.com](https://account.protonvpn.com), open **Downloads → WireGuard configuration**, and revoke the configurations you created for this machine. Do this especially if the machine was lost or given away.
 
+### 4. Remove leftover config files
+
+If any downloaded WireGuard `.conf` files are still around, delete them; they contain private keys:
+
+```bash
+ls ~/Downloads/*.conf 2>/dev/null
+shred -u ~/Downloads/pvpn-*.conf     # on an SSD, shred is not a guaranteed wipe
+```
+
 ### Check that it is gone
 
 ```bash
-command -v pvpn || echo "CLI removed"
+ls ~/.config/omarchy/plugins/allandehn.pvpn ~/.local/state/pvpn ~/.local/bin/pvpn 2>&1   # expect "No such file"
 nmcli -f NAME connection show | grep pvpn- || echo "no pvpn profiles left"
+sudo ls /etc/NetworkManager/system-connections | grep -i pvpn || echo "no stored keys left"
+ip link | grep -i pvpn || echo "no tunnel up"
 ```
 
 ## CLI
