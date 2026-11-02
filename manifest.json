@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "allandehn.pvpn",
   "name": "Proton VPN",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "author": "Allan Dehn",
   "license": "MIT",
   "description": "Proton VPN (NetworkManager WireGuard pvpn-*) indicator and panel. Boot follows the last state; right click toggles on/off, middle click refreshes.",

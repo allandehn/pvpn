@@ -204,18 +204,24 @@ Panel {
     function status(): string { return root.active !== "" ? root.active : "off" }
   }
 
-  BarIconButton {
-    id: button
+  // The pulse lives on a wrapper: WidgetButton binds its own opacity (dimmed) with a
+  // smoothing Behavior, which swallowed the pulse when set on the button itself.
+  Item {
     anchors.fill: parent
-    bar: root.bar
-    text: root.on ? root.glyphOn : root.glyphOff
-    dimmed: !root.on
     opacity: root.pulseOpacity
-    tooltipText: root.opened ? "" : root.busy ? root.busyTip : (root.on ? root.displayName + " · " + root.countryOf(root.shown) : root.displayName + " · Off")
-    onPressed: function(b) {
-      if (b === Qt.RightButton) root.toggleVpn()
-      else if (b === Qt.MiddleButton) root.refresh()
-      else root.toggle()
+
+    BarIconButton {
+      id: button
+      anchors.fill: parent
+      bar: root.bar
+      text: root.on ? root.glyphOn : root.glyphOff
+      dimmed: !root.on
+      tooltipText: root.opened ? "" : root.busy ? root.busyTip : (root.on ? root.displayName + " · " + root.countryOf(root.shown) : root.displayName + " · Off")
+      onPressed: function(b) {
+        if (b === Qt.RightButton) root.toggleVpn()
+        else if (b === Qt.MiddleButton) root.refresh()
+        else root.toggle()
+      }
     }
   }
 
