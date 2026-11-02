@@ -18,11 +18,12 @@ You need [Omarchy](https://omarchy.org) and a Proton VPN account. It takes about
 
 - Sign in at [account.protonvpn.com](https://account.protonvpn.com).
 - Go to **Downloads → WireGuard configuration** ([Proton's guide](https://protonvpn.com/support/wireguard-configurations)).
-- Download one file for each location you want. They land in your Downloads folder.
+- Type a name for the file, choose **Linux** as the platform, pick a server, then click **Create** and then **Download**.
+- Do this once for each location you want. Your VPN files land in your Downloads folder.
 
 ### 2. Install pvpn
 
-Open a terminal with **Super + Enter**. Copy these lines, paste them into the terminal with **Ctrl + Shift + V**, and press **Enter**:
+Open a terminal with **Super + Enter**. Copy these lines (on GitHub, use the copy button at the top right of the box), paste them with **Super + V** (or **Ctrl + Shift + V**), and press **Enter** if the last line hasn't run yet:
 
 ```bash
 git clone https://github.com/allandehn/pvpn.git
@@ -30,7 +31,7 @@ cd pvpn
 ./install.sh
 ```
 
-A shield appears in your top bar.
+A shield appears in your top bar (it may take a few seconds).
 
 If you like, you can [read install.sh on GitHub](https://github.com/allandehn/pvpn/blob/main/install.sh) before you run it. It's short.
 
@@ -42,7 +43,9 @@ In the same terminal, run:
 pvpn import
 ```
 
-It adds every file from step 1 and then deletes the downloaded files, because they hold your private key.
+It adds your VPN files from step 1, then deletes the downloaded copies, because they hold your private key. You'll see a line for each location it added, such as "Added Denmark (pvpn-dk)".
+
+No files found? Check step 1.
 
 That's it. Click the shield.
 
