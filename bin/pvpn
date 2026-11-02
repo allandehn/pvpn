@@ -64,7 +64,13 @@ bring() {
   while IFS= read -r c; do nmcli connection down "$c" >/dev/null 2>&1; done < <(active)
   nmcli connection up "$name" >/dev/null 2>&1 || return 1
   dev=$(nmcli -g connection.interface-name connection show "$name" 2>/dev/null)
-  ping -c2 -W2 ${dev:+-I "$dev"} "$PROBE" >/dev/null 2>&1
+  # A new WireGuard peer only handshakes on first traffic, so the first ping
+  # can be lost. Retry for up to ~10 s and stop at the first reply.
+  local i
+  for i in 1 2 3 4 5; do
+    ping -c1 -W2 ${dev:+-I "$dev"} "$PROBE" >/dev/null 2>&1 && return 0
+  done
+  return 1
 }
 
 # switch/reconnect with rollback. $1 name, $2 "Connected"|"Reconnected", $3 "connect"|"reconnect"
