@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+# pvpn - Proton VPN (NetworkManager WireGuard "pvpn-*" profiles) helper.
+# It is the single engine for the Omarchy bar plugin and for the terminal.
+#
+#   pvpn                  menu (Walker, else fzf)
+#   pvpn status           connected profile and boot profile
+#   pvpn list             pvpn-* WireGuard profiles
+#   pvpn up NAME          switch to NAME (verified, rolls back on failure)
+#   pvpn reconnect NAME   reconnect NAME
+#   pvpn down             disconnect all pvpn-* profiles
+#   pvpn toggle           down if connected, else up the last used profile
+#   pvpn boot [NAME|none] show or set the boot profile
+#
+# Only connections that are type wireguard AND named pvpn-* are ever touched.
+# Boot follows the last state: a successful connect sets autoconnect=yes on that
+# profile and no on the other pvpn-* ones; down sets no on all of them.
+set -u
+VERSION="0.4.0"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/pvpn/last"
+PROBE="1.1.1.1"   # pinged through the tunnel to verify it carries traffic
+
+# name:autoconnect:active for every pvpn-* WireGuard profile, one nmcli call.
+rows() {
+  nmcli -t -f NAME,TYPE,AUTOCONNECT,ACTIVE connection show |
+    awk -F: '$2=="wireguard" && index($1,"pvpn-")==1 {print $1":"$3":"$4}'
+}
+list()   { rows | cut -d: -f1; }
+active() { rows | awk -F: '$3=="yes"{print $1}'; }
+valid()  { [ -n "${1:-}" ] && list | grep -Fxq -- "$1"; }
+need()   { valid "$1" || { echo "pvpn: '$1' is not a pvpn-* WireGuard connection" >&2; exit 2; }; }
+boot()   { rows | awk -F: '$2=="yes"{print $1}'; }
+
+label() { # pvpn-us-east -> United States (east)
+  local cc="${1#pvpn-}" rest="" land
+  case "$cc" in *-*) rest="${cc#*-}"; cc="${cc%%-*}" ;; esac
+  case "$cc" in
+    dk) land=Denmark ;; ee) land=Estonia ;; us) land="United States" ;; se) land=Sweden ;;
+    no) land=Norway ;; de) land=Germany ;; nl) land=Netherlands ;; ch) land=Switzerland ;;
+    fi) land=Finland ;; uk|gb) land="United Kingdom" ;; fr) land=France ;;
+    *) land="${cc^^}" ;;
+  esac
+  if [ -n "$rest" ]; then printf '%s (%s)\n' "$land" "${rest//-/ }"; else printf '%s\n' "$land"; fi
+}
+
+note() { # title [body]
+  if [ -t 1 ]; then printf '%s\n' "$*"; fi
+  notify-send -a "Proton VPN" "$@" 2>/dev/null || true
+}
+
+# Set autoconnect=yes on $1 only (""=none); modify only profiles that change.
+set_boot() {
+  local name="${1:-}" c ac want
+  while IFS=: read -r c ac _; do
+    if [ "$c" = "$name" ]; then want=yes; else want=no; fi
+    [ "$ac" = "$want" ] || nmcli connection modify "$c" connection.autoconnect "$want"
+  done < <(rows)
+}
+remember() { mkdir -p "${STATE%/*}"; printf '%s\n' "$1" > "$STATE"; }
+
+# Bring $1 up (dropping other pvpn-* first) and verify traffic through it.
+# `nmcli connection up` already waits for activation.
+bring() {
+  local name="$1" c dev
+  while IFS= read -r c; do nmcli connection down "$c" >/dev/null 2>&1; done < <(active)
+  nmcli connection up "$name" >/dev/null 2>&1 || return 1
+  dev=$(nmcli -g connection.interface-name connection show "$name" 2>/dev/null)
+  ping -c2 -W2 ${dev:+-I "$dev"} "$PROBE" >/dev/null 2>&1
+}
+
+# switch/reconnect with rollback. $1 name, $2 "Connected"|"Reconnected", $3 "connect"|"reconnect"
+go() {
+  local name="$1" ok="$2" verb="$3" prev
+  need "$name"
+  prev=$(active | head -n1)
+  if bring "$name"; then
+    set_boot "$name"; remember "$name"; note "$ok to $(label "$name")"; return 0
+  fi
+  nmcli connection down "$name" >/dev/null 2>&1
+  if [ -n "$prev" ] && [ "$prev" != "$name" ] && bring "$prev"; then
+    set_boot "$prev"; remember "$prev"
+    note "Couldn't $verb to $(label "$name")" "Still connected to $(label "$prev")"
+  else
+    set_boot ""; note "Couldn't $verb to $(label "$name")" "Proton VPN is off"
+  fi
+  return 1
+}
+
+down() {
+  local c
+  while IFS= read -r c; do nmcli connection down "$c" >/dev/null 2>&1; done < <(active)
+  set_boot ""; note "Proton VPN off"
+}
+
+last_or_first() {
+  local n=""; [ -r "$STATE" ] && IFS= read -r n < "$STATE"
+  if valid "$n"; then printf '%s\n' "$n"; else list | head -n1; fi
+}
+
+toggle() {
+  if [ -n "$(active)" ]; then down; else
+    local n; n=$(last_or_first)
+    [ -n "$n" ] || { note "No pvpn-* WireGuard connections found"; return 1; }
+    go "$n" Connected connect
+  fi
+}
+
+status() {
+  local a b; a=$(active | head -n1); b=$(boot | head -n1)
+  if [ -n "$a" ]; then echo "Connected: $a ($(label "$a"))"; else echo "Disconnected"; fi
+  echo "At boot: ${b:-none}"
+}
+
+ask() { if command -v walker >/dev/null; then walker --dmenu -p "$1"; else fzf --prompt "$1> "; fi; }
+
+menu() {
+  local a b items="" choice c tag
+  a=$(active | head -n1); b=$(boot | head -n1)
+  while IFS= read -r c; do
+    tag=""; [ "$c" = "$b" ] && tag=" [boot]"
+    if [ "$c" = "$a" ]; then items+="● $c (connected)$tag"$'\n'; else items+="○ $c$tag"$'\n'; fi
+  done < <(list)
+  [ -n "$a" ] && items+="✕ Disconnect"$'\n'
+  items+="ℹ Status"
+  choice=$(printf '%s' "$items" | ask "Proton VPN")
+  case "$choice" in
+    "") exit 0 ;;
+    "✕ Disconnect") down ;;
+    "ℹ Status") note "$(status)" ;;
+    *) c=$(printf '%s' "$choice" | sed -E 's/^[●○] //; s/ \[boot\]$//; s/ \(connected\)$//')
+       if [ "$c" = "$a" ]; then go "$c" Reconnected reconnect; else go "$c" Connected connect; fi ;;
+  esac
+}
+
+case "${1:-menu}" in
+  -v|--version) echo "pvpn $VERSION" ;;
+  menu) menu ;;
+  status) status ;;
+  list) list ;;
+  up) go "${2:?name}" Connected connect ;;
+  reconnect) go "${2:?name}" Reconnected reconnect ;;
+  down) down ;;
+  toggle) toggle ;;
+  boot) if [ $# -ge 2 ]; then if [ "$2" = none ]; then set_boot ""; else need "$2"; set_boot "$2"; fi
+        else b=$(boot | head -n1); echo "${b:-none}"; fi ;;
+  *) echo "usage: pvpn [menu|status|list|up NAME|reconnect NAME|down|toggle|boot [NAME|none]|--version]" >&2; exit 1 ;;
+esac
