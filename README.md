@@ -26,6 +26,9 @@ The repository and the CLI are `pvpn`, the Omarchy plugin id is `allandehn.pvpn`
 - Panel: on/off switch, one row per connection (country name), connected row in accent colour.
   Click a row (or move with `hjkl`/arrows and press `Enter`) to **switch** to it, or **reconnect** it if it is already active.
   `t` toggles, `r` reconnects, `Esc` closes. Rows are greyed out while the VPN is off; clicking one turns it on.
+- **Busy indicator:** while connecting, switching, checking the tunnel or disconnecting, the shield gently pulses
+  (after 0.3 s, so quick results don't flicker) and the tooltip says e.g. `Connecting to Denmark…` or `Checking Denmark…`.
+  Other rows are ignored until it's done. Set `PVPN_REDUCED_MOTION=1` in the shell's environment for a static dim icon instead.
 - The connection is verified (NetworkManager state + a ping through the tunnel) before it is reported as connected.
 - Desktop notifications: `Connected to Estonia`, `Reconnected to Denmark`, `Proton VPN off`, or
   `Couldn't connect to Estonia` – in which case the previous connection is restored (or it stays off).

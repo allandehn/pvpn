@@ -15,7 +15,7 @@
 # Boot follows the last state: a successful connect sets autoconnect=yes on that
 # profile and no on the other pvpn-* ones; down sets no on all of them.
 set -u
-VERSION="0.4.0"
+VERSION="0.5.0"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/pvpn/last"
 PROBE="1.1.1.1"   # pinged through the tunnel to verify it carries traffic
 
@@ -55,6 +55,9 @@ set_boot() {
     [ "$ac" = "$want" ] || nmcli connection modify "$c" connection.autoconnect "$want"
   done < <(rows)
 }
+# Progress for the bar plugin: "phase <connecting|switching|reconnecting|checking|
+# rollback|disconnecting> [NAME]" on stdout, only when stdout is not a terminal.
+phase() { [ -t 1 ] || printf 'phase %s %s\n' "$1" "${2:-}"; }
 remember() { mkdir -p "${STATE%/*}"; printf '%s\n' "$1" > "$STATE"; }
 
 # Bring $1 up (dropping other pvpn-* first) and verify traffic through it.
@@ -63,11 +66,11 @@ bring() {
   local name="$1" c dev
   while IFS= read -r c; do nmcli connection down "$c" >/dev/null 2>&1; done < <(active)
   nmcli connection up "$name" >/dev/null 2>&1 || return 1
+  phase checking "$name"
   dev=$(nmcli -g connection.interface-name connection show "$name" 2>/dev/null)
   # A new WireGuard peer only handshakes on first traffic, so the first ping
   # can be lost. Retry for up to ~10 s and stop at the first reply.
-  local i
-  for i in 1 2 3 4 5; do
+  for _ in 1 2 3 4 5; do
     ping -c1 -W2 ${dev:+-I "$dev"} "$PROBE" >/dev/null 2>&1 && return 0
   done
   return 1
@@ -78,11 +81,14 @@ go() {
   local name="$1" ok="$2" verb="$3" prev
   need "$name"
   prev=$(active | head -n1)
+  if [ "$verb" = reconnect ]; then phase reconnecting "$name"
+  elif [ -n "$prev" ] && [ "$prev" != "$name" ]; then phase switching "$name"
+  else phase connecting "$name"; fi
   if bring "$name"; then
     set_boot "$name"; remember "$name"; note "$ok to $(label "$name")"; return 0
   fi
   nmcli connection down "$name" >/dev/null 2>&1
-  if [ -n "$prev" ] && [ "$prev" != "$name" ] && bring "$prev"; then
+  if [ -n "$prev" ] && [ "$prev" != "$name" ] && { phase rollback "$prev"; bring "$prev"; }; then
     set_boot "$prev"; remember "$prev"
     note "Couldn't $verb to $(label "$name")" "Still connected to $(label "$prev")"
   else
@@ -93,6 +99,7 @@ go() {
 
 down() {
   local c
+  phase disconnecting
   while IFS= read -r c; do nmcli connection down "$c" >/dev/null 2>&1; done < <(active)
   set_boot ""; note "Proton VPN off"
 }

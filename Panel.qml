@@ -24,6 +24,26 @@ Panel {
   readonly property bool on: pending !== "" ? pending !== "off" : active !== ""
   readonly property string shown: pending !== "" && pending !== "off" ? pending : active
   readonly property bool connecting: pending !== "" && pending !== "off"
+  // Busy state (DC design): phase comes from `pvpn` stdout ("phase <name> [NAME]").
+  readonly property bool busy: action.running
+  property string phase: ""       // connecting|switching|reconnecting|checking|rollback|disconnecting
+  property string phaseTarget: ""
+  property string failedTarget: "" // "Couldn't connect to X" line; cleared on the next action
+  property bool pulsing: false     // true 300 ms after busy starts, so fast results don't flash
+  // No Omarchy reduced-motion setting is known; PVPN_REDUCED_MOTION=1 gives a static 0.6.
+  readonly property bool reducedMotion: (Quickshell.env("PVPN_REDUCED_MOTION") || "") === "1"
+  property real pulseOpacity: 1.0
+  readonly property string busyTip: {
+    var c = phaseTarget !== "" ? countryOf(phaseTarget) : (connecting ? countryOf(pending) : "")
+    switch (phase) {
+      case "switching": return "Switching to " + c + "…"
+      case "reconnecting": return "Reconnecting to " + c + "…"
+      case "checking": return "Checking " + c + "…"
+      case "rollback": return "Switching back to " + c + "…"
+      case "disconnecting": return "Disconnecting…"
+    }
+    return pending === "off" ? "Disconnecting…" : "Connecting to " + c + "…"
+  }
   readonly property string glyphOn: "󰒃"
   readonly property string glyphOff: "󰦞"
 
@@ -50,6 +70,9 @@ Panel {
   function pvpn(args, optimistic) {
     if (action.running) return
     pending = optimistic
+    phase = ""
+    phaseTarget = ""
+    failedTarget = ""
     lastError = ""
     action.errText = ""
     action.command = ["sh", "-c", 'p=$(command -v pvpn || printf %s "$HOME/.local/bin/pvpn"); exec "$p" "$@"', "pvpn"].concat(args)
@@ -65,7 +88,7 @@ Panel {
     for (var i = 0; i < conns.length; i++) if (conns[i].name === target) ok = true
     pvpn(["toggle"], ok ? target : (conns.length > 0 ? conns[0].name : ""))
   }
-  function pickConn(name) { root.close(); if (name === active) reconnect(name); else connectTo(name) }
+  function pickConn(name) { if (busy) return; root.close(); if (name === active) reconnect(name); else connectTo(name) }
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -107,11 +130,22 @@ Panel {
   Process {
     id: action
     property string errText: ""
+    stdout: SplitParser {
+      onRead: function(line) {
+        var p = String(line).trim().split(" ")
+        if (p[0] !== "phase" || p.length < 2) return
+        root.phase = p[1]
+        root.phaseTarget = p.length > 2 ? p.slice(2).join(" ") : ""
+      }
+    }
     stderr: SplitParser { onRead: function(line) { action.errText += (action.errText ? " " : "") + String(line) } }
     onExited: function(code) {
       // Code 1 = connect failed; the CLI already notified and rolled back.
+      if (code === 1 && root.connecting) root.failedTarget = root.pending
       if (code > 1) root.lastError = action.errText !== "" ? action.errText : "pvpn failed (exit " + code + ")"
       root.pending = ""
+      root.phase = ""
+      root.phaseTarget = ""
       lastUsed.reload()
       root.refresh()
     }
@@ -133,6 +167,24 @@ Panel {
   Timer { id: debounce; interval: 400; onTriggered: root.refresh() }
   Component.onCompleted: refresh()
 
+  // Pulse: the timer and animation only run while busy; idle costs nothing.
+  onBusyChanged: {
+    if (busy) { pulseDelay.restart(); return }
+    pulseDelay.stop()
+    pulsing = false
+    if (failedTarget !== "") pulseOpacity = 1.0   // failure: snap back
+    else settle.restart()                         // success: settle over 120 ms
+  }
+  Timer { id: pulseDelay; interval: 300; onTriggered: root.pulsing = true }
+  SequentialAnimation {
+    running: root.pulsing && !root.reducedMotion
+    loops: Animation.Infinite
+    NumberAnimation { target: root; property: "pulseOpacity"; from: 1.0; to: 0.4; duration: 700; easing.type: Easing.InOutSine }
+    NumberAnimation { target: root; property: "pulseOpacity"; from: 0.4; to: 1.0; duration: 700; easing.type: Easing.InOutSine }
+  }
+  onPulsingChanged: if (pulsing && reducedMotion) pulseOpacity = 0.6
+  NumberAnimation { id: settle; target: root; property: "pulseOpacity"; to: 1.0; duration: 120 }
+
   IpcHandler {
     target: root.ipcTarget
     function open(): void { root.open() }
@@ -152,7 +204,8 @@ Panel {
     bar: root.bar
     text: root.on ? root.glyphOn : root.glyphOff
     dimmed: !root.on
-    tooltipText: root.opened ? "" : (root.on ? "Proton VPN · " + root.countryOf(root.shown) : "Proton VPN · Off")
+    opacity: root.pulseOpacity
+    tooltipText: root.opened ? "" : root.busy ? root.busyTip : (root.on ? "Proton VPN · " + root.countryOf(root.shown) : "Proton VPN · Off")
     onPressed: function(b) {
       if (b === Qt.RightButton) root.toggleVpn()
       else if (b === Qt.MiddleButton) root.refresh()
@@ -178,10 +231,11 @@ Panel {
         if (!root.cursorActive) { root.cursorActive = true; return }
         root.cursorIndex = Math.max(0, Math.min(root.conns.length - 1, root.cursorIndex + dy))
       }
-      onActivateRequested: if (root.cursorActive && root.cursorIndex < root.conns.length) root.pickConn(root.conns[root.cursorIndex].name)
+      onActivateRequested: if (!root.busy && root.cursorActive && root.cursorIndex < root.conns.length) root.pickConn(root.conns[root.cursorIndex].name)
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(t) {
+        if (root.busy) return
         if (t === "t" || t === "T") root.toggleVpn()
         else if ((t === "r" || t === "R") && root.active !== "") root.reconnect(root.active)
       }
@@ -203,7 +257,7 @@ Panel {
                 id: hero
                 width: parent.width
                 title: "Proton VPN"
-                meta: root.connecting ? "Connecting…" : (root.on ? root.countryOf(root.shown) + " · " + root.shown : "Off")
+                meta: root.busy ? root.busyTip : (root.on ? root.countryOf(root.shown) + " · " + root.shown : "Off")
                 foreground: root.foreground
                 fontFamily: root.fontFamily
                 iconComponent: Component { Text { textFormat: Text.PlainText; text: root.on ? root.glyphOn : root.glyphOff; color: root.on ? root.foreground : root.dim; font.family: Style.font.family; font.pixelSize: Math.round(Style.font.display) } }
@@ -211,12 +265,23 @@ Panel {
                   ToggleSwitch {
                     id: powerSwitch
                     checked: root.on
-                    busy: action.running
+                    busy: root.busy
+                    enabled: !root.busy
                     foreground: hero.foreground
                     onToggled: root.toggleVpn()
                     PanelToolTip { visible: powerSwitch.containsMouse; text: root.on ? "Turn Proton VPN off" : "Turn Proton VPN on"; fontFamily: hero.fontFamily }
                   }
                 }
+              }
+              Text {
+                visible: root.failedTarget !== ""
+                width: parent.width
+                textFormat: Text.PlainText
+                text: "Couldn't connect to " + root.countryOf(root.failedTarget)
+                color: root.urgent
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                elide: Text.ElideRight
               }
               Text {
                 visible: root.lastError !== ""
@@ -268,7 +333,9 @@ Panel {
     property var conn: null
     property int rowIndex: 0
     readonly property string name: conn ? conn.name : ""
-    readonly property bool isActive: name !== "" && name === root.shown
+    // Accent shows what's true: the real active profile, not the pending target.
+    readonly property bool isActive: name !== "" && name === root.active
+    readonly property bool isTarget: root.busy && name !== "" && name === root.pending
 
     hasCursor: root.cursorActive && root.cursorIndex === rowIndex
     current: false
@@ -287,15 +354,29 @@ Panel {
     }
 
     Text {
-      id: label
-      anchors.left: parent.left
+      id: caption
+      visible: row.isTarget
       anchors.right: parent.right
-      anchors.leftMargin: Style.space(10)
       anchors.rightMargin: Style.space(10)
       anchors.verticalCenter: parent.verticalCenter
       textFormat: Text.PlainText
+      text: "Connecting…"
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+    }
+
+    Text {
+      id: label
+      anchors.left: parent.left
+      anchors.right: row.isTarget ? caption.left : parent.right
+      anchors.leftMargin: Style.space(10)
+      anchors.rightMargin: Style.space(10)
+      opacity: row.isTarget ? root.pulseOpacity : 1.0
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
       text: root.countryOf(row.name)
-      color: !root.on ? root.dim : (row.isActive ? Commons.Color.accent : root.foreground)
+      color: !root.on && !row.isTarget ? root.dim : (row.isActive ? Commons.Color.accent : root.foreground)
       font.family: root.fontFamily
       font.pixelSize: Style.font.body
       font.bold: row.isActive && root.on
