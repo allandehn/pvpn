@@ -126,12 +126,55 @@ omarchy-restart-shell                          # required: plugin edits only loa
 
 ## Uninstall
 
+Removing pvpn takes three steps. Step 1 removes the tool; steps 2 and 3 are optional and remove your VPN profiles and keys too.
+
+### 1. Remove the plugin and the CLI
+
+From the cloned `pvpn` folder:
+
 ```bash
 ./uninstall.sh
 ```
 
-This disables and removes the plugin, the CLI and the small state file. Your `pvpn-*` NetworkManager profiles stay;
-delete them with `nmcli connection delete pvpn-xx`.
+This does the following:
+
+- disables the bar plugin (`omarchy plugin disable allandehn.pvpn`)
+- deletes `~/.config/omarchy/plugins/allandehn.pvpn/`
+- deletes the CLI at `~/.local/bin/pvpn`
+- deletes the state file folder `~/.local/state/pvpn/`
+- restarts the Omarchy shell, so the icon disappears from the bar
+
+It does **not** touch your NetworkManager profiles, so a running tunnel stays up. To do it by hand instead, run the same commands:
+
+```bash
+omarchy plugin disable allandehn.pvpn
+rm -rf ~/.config/omarchy/plugins/allandehn.pvpn ~/.local/state/pvpn
+rm -f ~/.local/bin/pvpn
+omarchy-restart-shell
+```
+
+### 2. Optional: remove the VPN profiles
+
+First disconnect, then list and delete the profiles:
+
+```bash
+nmcli connection down pvpn-dk          # if it is connected
+nmcli -f NAME,TYPE connection show | grep pvpn-
+nmcli connection delete pvpn-dk        # repeat for each profile
+```
+
+Deleting a profile also deletes its private key from `/etc/NetworkManager/system-connections/`.
+
+### 3. Optional: revoke the keys at Proton
+
+Sign in at [account.protonvpn.com](https://account.protonvpn.com), open **Downloads → WireGuard configuration**, and revoke the configurations you created for this machine. Do this especially if the machine was lost or given away.
+
+### Check that it is gone
+
+```bash
+command -v pvpn || echo "CLI removed"
+nmcli -f NAME connection show | grep pvpn- || echo "no pvpn profiles left"
+```
 
 ## CLI
 
