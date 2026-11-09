@@ -45,11 +45,18 @@ Panel {
     }
     return pending === "off" ? "Disconnecting…" : "Connecting to " + c + "…"
   }
-  // Shown name, read once from manifest.json "displayName" (falls back to "VPN").
+  // Shown name + version, read once from this plugin's manifest.json.
   property string displayName: "VPN"
+  property string versionLabel: ""   // e.g. "v0.5.7"; empty until manifest loads
   FileView {
     path: Qt.resolvedUrl("manifest.json").toString().replace(/^file:\/\//, "")
-    onLoaded: { try { root.displayName = JSON.parse(text()).displayName || "VPN" } catch (e) {} }
+    onLoaded: {
+      try {
+        var m = JSON.parse(text())
+        root.displayName = m.displayName || "VPN"
+        if (m.version) root.versionLabel = "v" + m.version
+      } catch (e) {}
+    }
   }
   // Off icon: md-security (U+F0483) with the strike and knockout gap taken from
   // md-shield_off (U+F099E), combined from the font's outlines (units, y down).
@@ -370,6 +377,18 @@ Panel {
                   rowIndex: index
                 }
               }
+            }
+
+            // Dimmed plugin version, lower-right; sourced from manifest.json above.
+            Text {
+              visible: root.versionLabel !== ""
+              width: parent.width
+              textFormat: Text.PlainText
+              text: root.versionLabel
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              horizontalAlignment: Text.AlignRight
             }
           }
         }
