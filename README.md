@@ -1,6 +1,6 @@
 # pvpn
 
-A VPN switch for your Omarchy top bar. Turn Proton VPN on and off, and pick a country, in one click.
+A VPN switch for your Omarchy top bar. Turn Proton VPN on and off, and pick a location, in one click.
 
 Works with Proton VPN. Unofficial, not affiliated with Proton AG.
 
@@ -12,54 +12,40 @@ Works with Proton VPN. Unofficial, not affiliated with Proton AG.
 
 ## Get started
 
-You need [Omarchy](https://omarchy.org) and a Proton VPN account. The three steps take about 5 minutes, and you'll paste a few commands into a terminal.
+You need [Omarchy](https://omarchy.org) and a Proton VPN account. It takes about 5 minutes.
 
-### 1. Download your config files
-
-Proton gives you one small settings file per server (a WireGuard file). WireGuard is the fast VPN technology the connection uses.
+### 1. Download your VPN files
 
 - Sign in at [account.protonvpn.com](https://account.protonvpn.com).
 - Go to **Downloads → WireGuard configuration** ([Proton's guide](https://protonvpn.com/support/wireguard-configurations)).
-- Pick a server and download its `.conf` file.
-- Get one file per location you want. They'll land in your Downloads folder.
+- Type a name for the file, choose **Linux** as the platform, pick a server, then click **Create** and then **Download**.
+- Do this once for each location you want. Your VPN files land in your Downloads folder.
 
-**Keep these files private: they hold your key.**
+### 2. Install pvpn
 
-### 2. Import them
-
-Each connection needs a short name that starts with `pvpn-`, such as `pvpn-dk` for Denmark. Names can be at most 15 characters.
-
-Proton's file is named something like `DK-123.conf`. For that file, run:
-
-```bash
-nmcli connection import type wireguard file ~/Downloads/DK-123.conf &&
-nmcli connection modify DK-123 connection.id pvpn-dk connection.interface-name pvpn-dk connection.autoconnect no
-```
-
-- **Repeat for each file.** Run it again for every file you downloaded, swapping in that file's name and a short name of your choice.
-- **Names with extra words:** `pvpn-us-east` shows in the menu as "United States (east)", which helps when you have two in the same country.
-
-Then clean up. First list the files. Then delete each one you recognise by name:
-
-```bash
-ls ~/Downloads/*.conf
-shred -u ~/Downloads/DK-123.conf
-```
-
-This deletes the downloaded files. Your connections keep working.
-
-### 3. Install the bar icon
+Open a terminal with **Super + Enter**. Copy these lines (on GitHub, use the copy button at the top right of the box), paste them with **Super + V** (or **Ctrl + Shift + V**), and press **Enter** if the last line hasn't run yet:
 
 ```bash
 git clone https://github.com/allandehn/pvpn.git
 cd pvpn
-less install.sh      # read it first, it's short
 ./install.sh
 ```
 
-Reading it first is a good habit with any install script.
+A shield appears in your top bar (it may take a few seconds).
 
-The script restarts the bar for you. Then the shield appears in your top bar.
+If you like, you can [read install.sh on GitHub](https://github.com/allandehn/pvpn/blob/main/install.sh) before you run it. It's short.
+
+### 3. Add your locations
+
+In the same terminal, run:
+
+```bash
+pvpn import
+```
+
+It adds your VPN files from step 1, then deletes the downloaded copies, because they hold your private key. You'll see a line for each location it added, such as "Added Denmark (pvpn-dk)".
+
+No files found? Check step 1.
 
 That's it. Click the shield.
 
@@ -121,6 +107,7 @@ The bar runs `pvpn` for every change, so the bar and the terminal behave the sam
 | `pvpn reconnect NAME` | Reconnect |
 | `pvpn toggle` | Off, or back on with the last used connection |
 | `pvpn down` | Disconnect (and turn off autoconnect on all `pvpn-*` connections) |
+| `pvpn import [--name NAME] [FILE...]` | Add Proton WireGuard files as `pvpn-*` connections (default: all in ~/Downloads), then delete the files |
 | `pvpn boot [NAME\|none]` | Show or set the connection used at startup. Normally automatic: startup follows your last state. |
 | `pvpn --version` | Show the version |
 
@@ -267,7 +254,7 @@ To undo, set `ipv6.method` back to what it was before (`nmcli -g ipv6.method con
 
 ### Safer handling of config files
 
-- Instead of Downloads, make a private temporary folder with `tmp=$(mktemp -d) && echo "$tmp"`, then choose the temporary folder in the save dialog, or move the files there right away. Use `"$tmp/DK-123.conf"` in the import command, and afterwards `shred -u "$tmp"/DK-123.conf && rmdir "$tmp"`.
+- Instead of Downloads, make a private temporary folder with `tmp=$(mktemp -d) && echo "$tmp"`, then choose the temporary folder in the save dialog, or move the files there right away. Then run `pvpn import "$tmp"/*.conf && rmdir "$tmp"`.
 - Never keep config files in cloud-synced folders (Dropbox, Syncthing, Nextcloud, …).
 - On an SSD, neither `rm` nor `shred` guarantees a real wipe. Full-disk encryption is what really protects you.
 - After import, the key lives in `/etc/NetworkManager/system-connections/`, which only root can read.
@@ -335,12 +322,26 @@ ip link | grep -i pvpn || echo "no tunnel up"
 
 ### Manual install
 
+#### Install without the script
+
 ```bash
 mkdir -p ~/.config/omarchy/plugins/allandehn.pvpn
 cp manifest.json Panel.qml ~/.config/omarchy/plugins/allandehn.pvpn/
 install -m 755 bin/pvpn ~/.local/bin/pvpn      # required: the plugin calls it
 omarchy plugin enable allandehn.pvpn
 omarchy-restart-shell                          # required: plugin edits only load after a restart
+```
+
+#### Import files yourself
+
+`pvpn import` takes files from anywhere: `pvpn import ~/somewhere/DK-123.conf`. It names each connection `pvpn-` plus the location code (`pvpn-dk`, then `pvpn-dk-2` and so on). For your own name, use `pvpn import --name pvpn-us-east US-NY#45.conf`; `pvpn-us-east` shows in the menu as "United States (east)". Names can be at most 15 characters.
+
+Or do it by hand with `nmcli`:
+
+```bash
+nmcli connection import type wireguard file ~/Downloads/DK-123.conf &&
+nmcli connection modify DK-123 connection.id pvpn-dk connection.interface-name pvpn-dk connection.autoconnect no
+shred -u ~/Downloads/DK-123.conf
 ```
 
 Requirements: Omarchy with its Quickshell bar (plugin support), NetworkManager with WireGuard and `nmcli`, a Nerd Font (Omarchy's default works) and `notify-send` (libnotify).
