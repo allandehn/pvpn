@@ -48,7 +48,7 @@ Panel {
   }
   // Shown name + version, read once from this plugin's manifest.json.
   property string displayName: "VPN"
-  property string versionLabel: ""   // e.g. "v0.5.11"; empty until manifest loads
+  property string versionLabel: ""   // e.g. "v0.5.12"; empty until manifest loads
   FileView {
     path: Qt.resolvedUrl("manifest.json").toString().replace(/^file:\/\//, "")
     onLoaded: {
@@ -307,7 +307,6 @@ Panel {
                 id: hero
                 width: parent.width
                 title: root.displayName
-                detail: root.versionLabel   // PanelHero's own small outlined badge in the title row
                 meta: root.busy ? root.busyTip : (root.on ? root.countryOf(root.shown) + " · " + root.shown : "Off")
                 foreground: root.foreground
                 fontFamily: root.fontFamily
