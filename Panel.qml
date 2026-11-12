@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "oklch.js" as Oklch
 
 // Proton VPN indicator + panel for NetworkManager WireGuard "pvpn-*" profiles.
 // Reads state with one cheap `nmcli` query, woken by `nmcli monitor` lines that
@@ -88,9 +89,11 @@ Panel {
 
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
   readonly property color urgent: bar ? bar.urgent : Commons.Color.urgent
-  readonly property color dim: Qt.darker(foreground, 1.55)
+  // Binding dependencies stay live; conversion runs on colour changes, not hover/pulse.
+  readonly property color dim: Oklch.dim(foreground)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
-  readonly property color selectedFill: bar ? Style.selectedFillFor(bar.foreground, Commons.Color.accent) : "transparent"
+  // Deliberately bypass Style.selectedFillFor: keep the live accent's OKLCH hue.
+  readonly property color selectedFill: bar ? Oklch.hover(Commons.Color.accent, foreground) : "transparent"
 
   readonly property var countries: ({ dk: "Denmark", ee: "Estonia", us: "United States",
     se: "Sweden", no: "Norway", de: "Germany", nl: "Netherlands", ch: "Switzerland",

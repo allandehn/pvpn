@@ -10,7 +10,7 @@ command -v nmcli >/dev/null || { echo "nmcli (NetworkManager) is required" >&2; 
 command -v omarchy >/dev/null || { echo "Omarchy is required" >&2; exit 1; }
 
 mkdir -p "$dest" "$bindir"
-install -m 644 "$here/manifest.json" "$here/Panel.qml" "$dest/"
+install -m 644 "$here/manifest.json" "$here/Panel.qml" "$here/oklch.js" "$dest/"
 install -m 755 "$here/bin/pvpn" "$bindir/pvpn"
 
 omarchy plugin enable "$id" || true
