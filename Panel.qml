@@ -48,7 +48,7 @@ Panel {
   }
   // Shown name + version, read once from this plugin's manifest.json.
   property string displayName: "VPN"
-  property string versionLabel: ""   // e.g. "v0.5.7"; empty until manifest loads
+  property string versionLabel: ""   // e.g. "v0.5.12"; empty until manifest loads
   FileView {
     path: Qt.resolvedUrl("manifest.json").toString().replace(/^file:\/\//, "")
     onLoaded: {
@@ -254,7 +254,7 @@ Panel {
       text: root.on ? root.glyphOn : ""
       iconComponent: root.on ? null : shieldOffIcon
       dimmed: !root.on
-      tooltipText: root.opened ? "" : root.busy ? root.busyTip : (root.on ? root.displayName + " · " + root.countryOf(root.shown) : root.displayName + " · Off")
+      tooltipText: root.opened ? "" : root.busy ? root.busyTip : (root.on ? root.displayName + " · " + root.countryOf(root.shown) : root.displayName + " · Off") + (root.versionLabel !== "" ? " · " + root.versionLabel : "")
       onPressed: function(b) {
         if (b === Qt.RightButton) root.toggleVpn()
         else if (b === Qt.MiddleButton) root.refresh()
@@ -380,18 +380,6 @@ Panel {
                   rowIndex: index
                 }
               }
-            }
-
-            // Dimmed plugin version, lower-right; sourced from manifest.json above.
-            Text {
-              visible: root.versionLabel !== ""
-              width: parent.width
-              textFormat: Text.PlainText
-              text: root.versionLabel
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              horizontalAlignment: Text.AlignRight
             }
           }
         }
