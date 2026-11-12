@@ -48,7 +48,8 @@ Panel {
   }
   // Shown name + version, read once from this plugin's manifest.json.
   property string displayName: "VPN"
-  property string versionLabel: ""   // e.g. "v0.5.9"; empty until manifest loads
+  property string versionLabel: ""   // e.g. "v0.5.10"; empty until manifest loads
+  property real heroIconWidth: 0     // set by the panel hero icon; places the version after the title
   FileView {
     path: Qt.resolvedUrl("manifest.json").toString().replace(/^file:\/\//, "")
     onLoaded: {
@@ -305,10 +306,6 @@ Panel {
             implicitHeight: bodyColumn.implicitHeight
             height: implicitHeight
 
-            // Metrics for lining the version up with the last row's text.
-            FontMetrics { id: rowMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.body }
-            FontMetrics { id: versionMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
-
             Column {
               id: bodyColumn
               width: parent.width
@@ -327,12 +324,36 @@ Panel {
                 iconComponent: Component {
                   Item {
                     implicitWidth: root.on ? heroGlyph.implicitWidth : heroOff.width
+                    // Shared with the version label so it can sit right after the title.
+                    onImplicitWidthChanged: root.heroIconWidth = implicitWidth
+                    Component.onCompleted: root.heroIconWidth = implicitWidth
                     implicitHeight: heroGlyph.implicitHeight
                     opacity: root.on ? 1 : 0.45
                     Text { id: heroGlyph; visible: root.on; textFormat: Text.PlainText; text: root.glyphOn; color: root.foreground; font.family: Style.font.family; font.pixelSize: Math.round(Style.font.display) }
                     // md-security's ink is 918 of 1000 font units tall.
                     ShieldOff { id: heroOff; visible: !root.on; anchors.verticalCenter: parent.verticalCenter; height: Math.round(Style.font.display) * 0.918; color: root.foreground }
                   }
+                }
+                // Dimmed plugin version right after the bold title, on the
+                // title's baseline. PanelHero (Omarchy) only takes a plain
+                // title, so this is laid over it using PanelHero's own
+                // layout: icon, 14px gap, title (bold, Style.font.title);
+                // labels column (title, 2px, caption meta) centred vertically.
+                Text {
+                  id: versionText
+                  visible: root.versionLabel !== "" && root.displayName !== ""
+                  LayoutMirroring.enabled: false
+                  x: root.heroIconWidth + Style.space(14) + titleMetrics.advanceWidth + versionMetrics.advanceWidth(" ")
+                  y: Math.round((hero.height - (titleFont.height + Style.space(2) + metaFont.height)) / 2 + titleFont.ascent - versionMetrics.ascent)
+                  textFormat: Text.PlainText
+                  text: root.versionLabel
+                  color: root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  TextMetrics { id: titleMetrics; text: root.displayName; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
+                  FontMetrics { id: titleFont; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
+                  FontMetrics { id: metaFont; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.bold: true }
+                  FontMetrics { id: versionMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
                 }
                 trailingControl: Component {
                   ToggleSwitch {
@@ -397,28 +418,6 @@ Panel {
             }
             }
 
-            // Dimmed plugin version, floating on the same text line as the
-            // last location (shared baseline), so it adds no line of its own.
-            // ConnRow centres its label in a row of label height + xl, so the
-            // label's baseline sits xl/2 + descent above the column's bottom.
-            // It sits two characters further right than the row text's inset,
-            // in the panel's side padding. Hidden while the last row shows
-            // "Connecting…" so the two never overlap. No pointer handlers.
-            Text {
-              id: versionText
-              readonly property string lastConn: root.conns.length > 0 ? root.conns[root.conns.length - 1].name : ""
-              visible: root.versionLabel !== "" && !(root.busy && lastConn !== "" && lastConn === root.pending)
-              LayoutMirroring.enabled: false
-              anchors.right: parent.right
-              anchors.rightMargin: Style.space(10) - 2 * versionMetrics.advanceWidth("0")
-              anchors.baseline: parent.bottom
-              anchors.baselineOffset: -(Style.spacing.xl / 2 + rowMetrics.descent)
-              textFormat: Text.PlainText
-              text: root.versionLabel
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-            }
           }
         }
       }
