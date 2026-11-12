@@ -296,9 +296,27 @@ Panel {
         width: parent.width
         active: root.opened
         sourceComponent: Component {
-          Column {
+          // Wrapper so the version can float out of the Column's flow.
+          // Panel height follows implicitHeight; KeyboardPanel then adds its
+          // own padding around this content (Style.spacing.popupPadding).
+          Item {
+            id: bodyRoot
             width: body.width
-            spacing: Style.space(12)
+            implicitHeight: bodyColumn.implicitHeight + versionReserve
+            height: implicitHeight
+            // bodySmall's line box is slightly taller than the default 14px
+            // padding on JetBrains Mono (~15–16px vs 14px). Grow only by the
+            // overflow so the last row stays clear; otherwise sit the label
+            // entirely in that existing padding and add no extra line.
+            readonly property int versionReserve: {
+              if (root.versionLabel === "") return 0
+              return Math.max(0, Math.ceil(versionText.implicitHeight) - panel.padding)
+            }
+
+            Column {
+              id: bodyColumn
+              width: parent.width
+              spacing: Style.space(12)
 
             Column {
               width: parent.width
@@ -381,17 +399,28 @@ Panel {
                 }
               }
             }
+            }
 
-            // Dimmed plugin version, lower-right; sourced from manifest.json above.
+            // Dimmed plugin version, floating in the panel's bottom-right
+            // corner. Anchored to the content edge and shifted into
+            // KeyboardPanel's bottom padding (centered there when it fits).
+            // Right inset matches ConnRow. versionReserve keeps it from
+            // covering the last row or the empty-state line. No pointer
+            // handlers, so it cannot intercept row clicks. Stay on the
+            // physical right even if the card is mirrored.
             Text {
+              id: versionText
               visible: root.versionLabel !== ""
-              width: parent.width
+              LayoutMirroring.enabled: false
+              anchors.right: parent.right
+              anchors.bottom: parent.bottom
+              anchors.rightMargin: Style.space(10)
+              anchors.bottomMargin: -panel.padding + Math.max(0, (panel.padding - implicitHeight) / 2)
               textFormat: Text.PlainText
               text: root.versionLabel
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
-              horizontalAlignment: Text.AlignRight
             }
           }
         }
