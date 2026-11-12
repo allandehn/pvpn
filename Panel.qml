@@ -48,8 +48,7 @@ Panel {
   }
   // Shown name + version, read once from this plugin's manifest.json.
   property string displayName: "VPN"
-  property string versionLabel: ""   // e.g. "v0.5.10"; empty until manifest loads
-  property real heroIconWidth: 0     // set by the panel hero icon; places the version after the title
+  property string versionLabel: ""   // e.g. "v0.5.11"; empty until manifest loads
   FileView {
     path: Qt.resolvedUrl("manifest.json").toString().replace(/^file:\/\//, "")
     onLoaded: {
@@ -255,7 +254,7 @@ Panel {
       text: root.on ? root.glyphOn : ""
       iconComponent: root.on ? null : shieldOffIcon
       dimmed: !root.on
-      tooltipText: root.opened ? "" : root.busy ? root.busyTip : (root.on ? root.displayName + " · " + root.countryOf(root.shown) : root.displayName + " · Off")
+      tooltipText: root.opened ? "" : root.busy ? root.busyTip : (root.on ? root.displayName + " · " + root.countryOf(root.shown) : root.displayName + " · Off") + (root.versionLabel !== "" ? " · " + root.versionLabel : "")
       onPressed: function(b) {
         if (b === Qt.RightButton) root.toggleVpn()
         else if (b === Qt.MiddleButton) root.refresh()
@@ -297,19 +296,9 @@ Panel {
         width: parent.width
         active: root.opened
         sourceComponent: Component {
-          // Wrapper so the version can float out of the Column's flow.
-          // Panel height follows implicitHeight; KeyboardPanel then adds its
-          // own padding around this content (Style.spacing.popupPadding).
-          Item {
-            id: bodyRoot
+          Column {
             width: body.width
-            implicitHeight: bodyColumn.implicitHeight
-            height: implicitHeight
-
-            Column {
-              id: bodyColumn
-              width: parent.width
-              spacing: Style.space(12)
+            spacing: Style.space(12)
 
             Column {
               width: parent.width
@@ -318,42 +307,19 @@ Panel {
                 id: hero
                 width: parent.width
                 title: root.displayName
+                detail: root.versionLabel   // PanelHero's own small outlined badge in the title row
                 meta: root.busy ? root.busyTip : (root.on ? root.countryOf(root.shown) + " · " + root.shown : "Off")
                 foreground: root.foreground
                 fontFamily: root.fontFamily
                 iconComponent: Component {
                   Item {
                     implicitWidth: root.on ? heroGlyph.implicitWidth : heroOff.width
-                    // Shared with the version label so it can sit right after the title.
-                    onImplicitWidthChanged: root.heroIconWidth = implicitWidth
-                    Component.onCompleted: root.heroIconWidth = implicitWidth
                     implicitHeight: heroGlyph.implicitHeight
                     opacity: root.on ? 1 : 0.45
                     Text { id: heroGlyph; visible: root.on; textFormat: Text.PlainText; text: root.glyphOn; color: root.foreground; font.family: Style.font.family; font.pixelSize: Math.round(Style.font.display) }
                     // md-security's ink is 918 of 1000 font units tall.
                     ShieldOff { id: heroOff; visible: !root.on; anchors.verticalCenter: parent.verticalCenter; height: Math.round(Style.font.display) * 0.918; color: root.foreground }
                   }
-                }
-                // Dimmed plugin version right after the bold title, on the
-                // title's baseline. PanelHero (Omarchy) only takes a plain
-                // title, so this is laid over it using PanelHero's own
-                // layout: icon, 14px gap, title (bold, Style.font.title);
-                // labels column (title, 2px, caption meta) centred vertically.
-                Text {
-                  id: versionText
-                  visible: root.versionLabel !== "" && root.displayName !== ""
-                  LayoutMirroring.enabled: false
-                  x: root.heroIconWidth + Style.space(14) + titleMetrics.advanceWidth + versionMetrics.advanceWidth(" ")
-                  y: Math.round((hero.height - (titleFont.height + Style.space(2) + metaFont.height)) / 2 + titleFont.ascent - versionMetrics.ascent)
-                  textFormat: Text.PlainText
-                  text: root.versionLabel
-                  color: root.dim
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  TextMetrics { id: titleMetrics; text: root.displayName; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
-                  FontMetrics { id: titleFont; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
-                  FontMetrics { id: metaFont; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.bold: true }
-                  FontMetrics { id: versionMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
                 }
                 trailingControl: Component {
                   ToggleSwitch {
@@ -416,8 +382,6 @@ Panel {
                 }
               }
             }
-            }
-
           }
         }
       }
