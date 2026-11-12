@@ -302,16 +302,12 @@ Panel {
           Item {
             id: bodyRoot
             width: body.width
-            implicitHeight: bodyColumn.implicitHeight + versionReserve
+            implicitHeight: bodyColumn.implicitHeight
             height: implicitHeight
-            // bodySmall's line box is slightly taller than the default 14px
-            // padding on JetBrains Mono (~15–16px vs 14px). Grow only by the
-            // overflow so the last row stays clear; otherwise sit the label
-            // entirely in that existing padding and add no extra line.
-            readonly property int versionReserve: {
-              if (root.versionLabel === "") return 0
-              return Math.max(0, Math.ceil(versionText.implicitHeight) - panel.padding)
-            }
+
+            // Metrics for lining the version up with the last row's text.
+            FontMetrics { id: rowMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+            FontMetrics { id: versionMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
 
             Column {
               id: bodyColumn
@@ -401,21 +397,22 @@ Panel {
             }
             }
 
-            // Dimmed plugin version, floating in the panel's bottom-right
-            // corner. Anchored to the content edge and shifted into
-            // KeyboardPanel's bottom padding (centered there when it fits).
-            // Right inset matches ConnRow. versionReserve keeps it from
-            // covering the last row or the empty-state line. No pointer
-            // handlers, so it cannot intercept row clicks. Stay on the
-            // physical right even if the card is mirrored.
+            // Dimmed plugin version, floating on the same text line as the
+            // last location (shared baseline), so it adds no line of its own.
+            // ConnRow centres its label in a row of label height + xl, so the
+            // label's baseline sits xl/2 + descent above the column's bottom.
+            // It sits two characters further right than the row text's inset,
+            // in the panel's side padding. Hidden while the last row shows
+            // "Connecting…" so the two never overlap. No pointer handlers.
             Text {
               id: versionText
-              visible: root.versionLabel !== ""
+              readonly property string lastConn: root.conns.length > 0 ? root.conns[root.conns.length - 1].name : ""
+              visible: root.versionLabel !== "" && !(root.busy && lastConn !== "" && lastConn === root.pending)
               LayoutMirroring.enabled: false
               anchors.right: parent.right
-              anchors.bottom: parent.bottom
-              anchors.rightMargin: Style.space(10)
-              anchors.bottomMargin: -panel.padding + Math.max(0, (panel.padding - implicitHeight) / 2)
+              anchors.rightMargin: Style.space(10) - 2 * versionMetrics.advanceWidth("0")
+              anchors.baseline: parent.bottom
+              anchors.baselineOffset: -(Style.spacing.xl / 2 + rowMetrics.descent)
               textFormat: Text.PlainText
               text: root.versionLabel
               color: root.dim
