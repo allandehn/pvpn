@@ -17,7 +17,7 @@
 # Boot follows the last state: a successful connect sets autoconnect=yes on that
 # profile and no on the other pvpn-* ones; down sets no on all of them.
 set -u
-VERSION="0.5.11"
+VERSION="0.5.12"
 DISPLAY_NAME="${PVPN_DISPLAY_NAME:-VPN}"   # notification app name/title (not a trademark)
 NOTIFY_ID="${XDG_STATE_HOME:-$HOME/.local/state}/pvpn/notify-id"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/pvpn/last"
