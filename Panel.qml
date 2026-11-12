@@ -48,7 +48,7 @@ Panel {
   }
   // Shown name + version, read once from this plugin's manifest.json.
   property string displayName: "VPN"
-  property string versionLabel: ""   // e.g. "v0.5.7"; empty until manifest loads
+  property string versionLabel: ""   // e.g. "v0.5.8"; empty until manifest loads
   FileView {
     path: Qt.resolvedUrl("manifest.json").toString().replace(/^file:\/\//, "")
     onLoaded: {
